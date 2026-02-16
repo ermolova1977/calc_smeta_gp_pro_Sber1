@@ -1,0 +1,154 @@
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Смета ГП PRO++++ (от бюджета проекта)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<style>
+:root{
+--bg:#0b1020;
+--card:#121a33;
+--text:#e9eeff;
+--muted:#9aa7c7;
+--ok:#22c55e;
+--bad:#ef4444;
+--warn:#fbbf24;
+--mono:ui-monospace,Consolas,monospace;
+--sans:system-ui,Segoe UI,Roboto;
+}
+body{margin:0;background:linear-gradient(120deg,#070a14,#0b1020);color:var(--text);font-family:var(--sans);}
+.wrap{max-width:1500px;margin:30px auto;padding:0 20px;}
+.card{background:rgba(18,26,51,.9);border-radius:14px;padding:18px;margin-bottom:18px}
+h1{font-size:20px}
+h2{font-size:14px;color:#cfe0ff}
+.row{display:grid;grid-template-columns:1.8fr 1fr;gap:10px;margin-bottom:8px}
+input{width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#0b1229;color:white}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td,th{padding:8px;border-bottom:1px solid #334155;text-align:right}
+th{text-align:left}
+.ok{color:var(--ok)}
+.bad{color:var(--bad)}
+.warn{color:var(--warn)}
+button{padding:8px 12px;border-radius:8px;border:none;background:#1e40af;color:white;cursor:pointer;margin-right:10px;margin-top:10px}
+.small{font-size:11px;color:var(--muted)}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+<h1>Формирование сметы Генподрядчика (от бюджета проекта, столбец C)</h1>
+
+<div class="card">
+<h2>1️⃣ Бюджет проекта — Глава 2 (столбец C)</h2>
+
+<div class="row">
+<label>Глава 2 — Строительство (бюджет проекта)</label>
+<input id="budget_ch2" value="613842008.3475">
+</div>
+
+<h3 style="color:#9aa7c7">Исключаемые статьи (не входят в договор ГП)</h3>
+
+<div class="row"><label>2.6 Служба заказчика</label><input id="g26" value="4000000"></div>
+<div class="row"><label>2.7 Проектирование</label><input id="g27" value="44830000"></div>
+<div class="row"><label>2.8 Непредвиденные</label><input id="g28" value="26806612.3975"></div>
+<div class="row"><label>2.9 Инфляция</label><input id="g29" value="50903148"></div>
+
+<div class="small">
+Лимит 2.1–2.5 до прямых оплат поставщикам = 487 302 247,95 ₽
+</div>
+</div>
+
+<div class="card">
+<h2>2️⃣ Прямые оплаты поставщикам (вне договора ГП)</h2>
+<table id="supplierTable">
+<thead>
+<tr>
+<th>Поставщик</th>
+<th>Договор</th>
+<th>Сумма</th>
+<th></th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+<button onclick="addSupplier()">Добавить строку</button>
+</div>
+
+<div class="card">
+<h2>3️⃣ Параметры договора ГП</h2>
+<div class="row"><label>Накладные (%)</label><input id="overhead" value="10"></div>
+<div class="row"><label>Прибыль ГП (%)</label><input id="profit" value="6"></div>
+</div>
+
+<div class="card">
+<h2>4️⃣ Расчет лимита договора ГП</h2>
+<table>
+<tr><th>Бюджет Глава 2</th><td id="o_budget"></td></tr>
+<tr><th>Минус 2.6–2.9</th><td id="o_excluded"></td></tr>
+<tr><th>Минус прямые поставщики</th><td id="o_suppliers"></td></tr>
+<tr><th><b>Лимит договора ГП</b></th><td id="o_gp_limit"></td></tr>
+<tr><th>Допустимые прямые</th><td id="o_direct"></td></tr>
+<tr><th>Накладные</th><td id="o_oh"></td></tr>
+<tr><th>Прибыль ГП</th><td id="o_profit"></td></tr>
+<tr><th><b>Итого договор ГП</b></th><td id="o_total"></td></tr>
+</table>
+</div>
+
+<button onclick="calculate()">Пересчитать</button>
+<button onclick="window.print()">Сформировать PDF</button>
+
+</div>
+
+<script>
+
+function n(v){return parseFloat(v.toString().replace(/\s/g,''))||0}
+function f(x){return Math.round(x).toLocaleString("ru-RU")+" ₽"}
+
+function addSupplier(){
+let row=document.createElement("tr")
+row.innerHTML=`
+<td><input></td>
+<td><input></td>
+<td><input oninput="calculate()"></td>
+<td><button onclick="this.parentElement.parentElement.remove();calculate()">X</button></td>`
+document.querySelector("#supplierTable tbody").appendChild(row)
+}
+
+function calculate(){
+
+let budget=n(budget_ch2.value)
+let excluded=n(g26.value)+n(g27.value)+n(g28.value)+n(g29.value)
+
+let supplierSum=0
+document.querySelectorAll("#supplierTable tbody tr").forEach(r=>{
+supplierSum+=n(r.children[2].children[0].value||"0")
+})
+
+let gp_limit=budget-excluded-supplierSum
+
+let o=n(overhead.value)/100
+let p=n(profit.value)/100
+
+let direct=gp_limit/(1+o+p*(1+o))
+let oh=direct*o
+let pr=(direct+oh)*p
+let total=direct+oh+pr
+
+o_budget.innerHTML=f(budget)
+o_excluded.innerHTML=f(excluded)
+o_suppliers.innerHTML=f(supplierSum)
+o_gp_limit.innerHTML=f(gp_limit)
+o_direct.innerHTML=f(direct)
+o_oh.innerHTML=f(oh)
+o_profit.innerHTML=f(pr)
+o_total.innerHTML=f(total)
+
+}
+
+addSupplier()
+calculate()
+
+</script>
+</body>
+</html>
